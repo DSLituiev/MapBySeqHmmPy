@@ -1,0 +1,242 @@
+    1  cd D:Documents/MATLAB/
+    2  ls
+    3  cd MapBySeqHmm
+    4  ls
+    5  git status
+    6  git status
+    7  git status
+    8  git log
+    9  git log --oneline
+   10  git status
+   11  git rm README.txt
+   12  git status
+   13  git add README.md
+   14  git status
+   15  git show
+   16  git diff --cached
+   17  git commit -m "readme file is re-written"
+   18  git log
+   19  git remote -v
+   20  ls
+   21  git push 
+   22  git remote add ssh_origin git@github.com:DLituiev/MapBySeqHmm.git
+   23  git remote -v
+   24  git pull ssh_origin
+   25  git remote rm ssh_origin
+   26  git remote -v
+   27  cd
+   28  mkdir tmp
+   29  cd tmp/
+   30  python 
+   31  which python
+   32  easy_install-3.4.exe virtualenv
+   33  virtualenv -h
+   34  virtualenv --version
+   35  virtualenv --system-site-packages playground
+   36  du -sh playground/
+   37  ls 
+   38  cd playground/
+   39  ls 
+   40  ls -l
+   41  source Scripts/activate
+   42  which python
+   43  ls Scripts/
+   44  ls -l Scripts/
+   45  easy_install bottle
+   46  python
+   47  deactivate
+   48  python
+   49  ls
+   50  source Scripts/activate
+   51  less Scripts/activate
+   52  cmd
+   53  ipython
+   54  easy_install ipython
+   55  ipython
+   56  vim app.py
+   57  python app.py 
+   58  vim app.py 
+   59  python app.py 
+   60  cat app.py 
+   61  cat algorithm.py 
+   62  ls
+   63  mkdir src
+   64  ls
+   65  cd src/
+   66  git init .
+   67  ls
+   68  ls ..
+   69  mv ../algorithm.py .
+   70  mv ../app.py .
+   71  rm -rf ../__pycache__/
+   72  ls -l ..
+   73  ls ../Include/
+   74  ls ../Include/
+   75  ls ../Lib/
+   76  ls ../Lib/site-packages/
+   77  ls
+   78  mkdir our_package
+   79  mv algorithm.py our_package/
+   80  ls -l
+   81  ls our_package/
+   82  touch our_package/__init__.py
+   83  vim app.py 
+   84  python app.py 
+   85  vim app.py 
+   86  ls our_package/
+   87  vim app.py 
+   88  python app.py 
+   89  fg
+   90  vim app.py 
+   91  pytho app.py 
+   92  python app.py 
+   93  vim app.py 
+   94  python app.py 
+   95  cd our_package/
+   96  ls
+   97  cat algorithm.py 
+   98  cd ..
+   99  vim app.py 
+  100  python app.py 
+  101  vim our_package/__init__.py 
+  102  python app.py 
+  103  vim app.py 
+  104  python app.py 
+  105  cat our_package/__init__.py 
+  106  vim our_package/__init__.py
+  107  python app.py 
+  108  fg
+  109  vim our_package/__init__.py
+  110  ls -l
+  111  vim setup.py
+  112  python setup.py sdist
+  113  python setup.py sdist
+  114  cat setup.py 
+  115  python setup.py 
+  116  python setup.py --help
+  117  ls -l
+  118  ls dist/
+  119  easy_install dist/our_package-0.0.1.zip 
+  120  mkdir test
+  121  cp app.py  test/
+  122  cd test/
+  123  python app.py 
+  124  cat app.py 
+  125  pip uninstall our_package
+  126  pip install pytest
+  127  mv app.py  test_0.py
+  128  vim test_0.py 
+  129  cd ..
+  130  python setup.py develop
+  131  ls -l
+  132  py.test test/
+  133  cat test/test_0.py 
+  134  vim test/test_0.py
+  135  mv test/test_0.py test/test_algorithm.py
+  136  py.test test/
+  137  vim test/test_algorithm.py 
+  138  py.test test/
+  139  py.test --pdb test/
+  140  py.test
+  141  py.test --help
+  142  vim test/test_algorithm.py 
+  143  py.test test/
+  144  vim test/test_algorithm.py 
+  145  py.test test/
+  146  vim setup.py 
+  147  python setup.py develo
+  148  python setup.py develop
+  149  hiho
+  150  vim our_package/algorithm.py 
+  151  hiho
+  152  python setup.py develop
+  153  hiho
+  154  vim setup.py 
+  155  hiho
+  156  python setup.py develop
+  157  hiho
+  158  cat setup.py 
+  159  cat our_package/algorithm.py 
+  160  hiho
+  161  cd ../Scripts/
+  162  ls
+  163  cat hiho-script.py 
+  164  cd ..
+  165  cd ..
+  166  cd playground/src/
+  167  ls
+  168  cd ..
+  169  mkdir sandbox
+  170  cd sandbox/
+  171  vim template_method_pattern.py
+  172  python template_method_pattern.py
+  173  vim template_method_pattern.py
+  174  python template_method_pattern.py
+  175  fg
+  176  +vim
+  177  vim template_method_pattern.py
+  178  python template_method_pattern.py
+  179  fg
+  180  vim template_method_pattern.py
+  181  python template_method_pattern.py
+  182  fg
+  183  vim template_method_pattern.py
+  184  python template_method_pattern.py
+  185  vim template_method_pattern.py
+  186  python template_method_pattern.py
+  187  fg
+  188  vim template_method_pattern.py
+  189  python template_method_pattern.py
+  190  vim template_method_pattern.py
+  191  deactivate
+  192  ls
+  193  cd ../
+  194  cd ..
+  195  ls
+  196  cd ..
+  197  ls
+  198  mkdir MapBySeqHmmPy
+  199  virtualenv MapBySeqHmmPy
+  200  ls
+  201  cd MapBySeqHmmPy/
+  202  ls
+  203  emacs
+  204  mkdir src
+  205  git init 
+  206  touch __init__.py
+  207  ls
+  208  cd src/
+  209  ls
+  210  mv MaBySeqHmmPy.py MapBySeqHmmPy.py
+  211  vim MapBySeqHmmPy.py 
+  212  import MapBySeqHmmPy.py 
+  213  python
+  214  virtualenv
+  215  virtualenv MapBySeqHmmPy.py 
+  216* virtualenv MapBySeqHmmPyl
+  217  lsls
+  218  ls
+  219  rm MapBySeqHmmPy
+  220  rm -rf  MapBySeqHmmPy
+  221  cd ../
+  222  ls
+  223  source Scripts/activate
+  224  ls
+  225  cd src/
+  226  ls
+  227  ls
+  228  cd ..
+  229  mv __init__.py  ./src/
+  230  cd src/
+  231  ls
+  232  python
+  233  ls
+  234  ls 
+  235  ls
+  236  python setup.py sdist
+  237  python setup.py sdist
+  238  python setup.py develop
+  239  ipython
+  240  pypi install ipython
+  241  history
+  242  history >> history.txt

@@ -1,0 +1,7 @@
+setup.py
+MapBySeqHmm.egg-info/PKG-INFO
+MapBySeqHmm.egg-info/SOURCES.txt
+MapBySeqHmm.egg-info/dependency_links.txt
+MapBySeqHmm.egg-info/entry_points.txt
+MapBySeqHmm.egg-info/not-zip-safe
+MapBySeqHmm.egg-info/top_level.txt
