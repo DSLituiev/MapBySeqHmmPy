@@ -16,7 +16,8 @@ FASTA_VIEW_CMD = 'samtools faidx'
 def runcmd(x):
    assert (type(x) == str), 'not a string!'
    p = subprocess.Popen( x , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-   return p
+   out, err = p.communicate()
+   return (out, err)
 
 for line in snp_table:
     lineVals = line.split(';')
@@ -32,8 +33,7 @@ for line in snp_table:
     chrm_range = chrom_str+':'+ '%u' % region_start+ '-'+'%u' % region_end
     curr_cmd = [FASTA_VIEW_CMD, in_fas_file, chrm_range]
 
-    p = runcmd(' '.join(curr_cmd) )
-    out, err = p.communicate()
+    out, err = runcmd(' '.join(curr_cmd) )
 
     out_lines = out.decode('utf-8').split('\n')
     out_lines[0] = '>'+chrom_str+':%u' % snp_position
@@ -41,15 +41,3 @@ for line in snp_table:
     out_decoded =  '\n'.join(out_lines) # python3
     print(out_decoded)
 
-
-ORGANISM = 'Vitis'
-
-ORGANISM = 'Arabidopsis'
-FMT = '"2 scomnames stitle"'
-fasta_str = ' "CATTTGTTATATTGGATACAAGCTTTGCTACGATCTACATTTGGGAATGTGAGTCTCTTA" '
-cmd_blast = 'echo '+ fasta_str + ' | ' + \
-'blastn -remote -db nr -entrez_query "' + ORGANISM + '[Organism]" -evalue 1e-20 -num_alignments 5 -outfmt ' + FMT
-p = runcmd( cmd_blast  )
-out, err = p.communicate()
-out_lines = out.decode('utf-8').split('\n')
-print('\n'.join(out_lines))
