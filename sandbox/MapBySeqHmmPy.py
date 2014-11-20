@@ -58,11 +58,11 @@ class filterMask:
 
 class chromosomeData:    
     def getData(self, chrName):
-    """retrieve data for each position on a given chromosome from a database"""
-        curs = self.chromosomes[chrN].conn.cursor()
-		for ff in chrDataFields.items():
-			curs.execute('SELECT %s FROM stocks WHERE %s' % (ff, filterMask) )
-			chrDataFields[ff] = curs.fetchall()
+        """retrieve data for each position on a given chromosome from a database"""
+        curs = self.chromosomes[chrName].conn.cursor()
+        for ff in chrDataFields.items():
+            curs.execute('SELECT %s FROM stocks WHERE %s' % (ff, filterMask) )
+            chrDataFields[ff] = curs.fetchall()
         
         
 class rawData(chromosomeData):
@@ -71,9 +71,9 @@ class rawData(chromosomeData):
         for chrN in chrNames:
             self.chromosomes[chrN] = db.getSqlConnection(chrN)
 		
-		self.chrDataFields = {}
-		for ff in fieldNames:
-			self.chrDataFields[ff] = []
+        self.chrDataFields = {}
+        for ff in fieldNames:
+            self.chrDataFields[ff] = []
 
     
 class snpDbSqlite:
