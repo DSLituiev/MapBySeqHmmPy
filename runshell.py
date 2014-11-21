@@ -11,4 +11,4 @@ def runcmd(x):
    assert (type(x) == str), 'not a string!'
    p = subprocess.Popen( x , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
    out, err = p.communicate()
-   return (out, err)
+   return (out.decode('utf-8'), err.decode('utf-8'))

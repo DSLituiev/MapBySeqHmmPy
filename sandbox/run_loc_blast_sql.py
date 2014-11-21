@@ -136,12 +136,36 @@ def compare_alignments(xml_string, LOC_IND):
     return (mathched_flag, q_allele, contig, hsp_fields)
 
 #####################################################################
+def initializeSnpTable(conn, species, chrNumber = 5):
+    
+    dbases = [''] * chrNumber
+    
+    with conn:
+        curs = conn.cursor()
+        
+        for cc in range(1,chrNumber+1):
+            dbases[cc-1] = 'Conservation_%s_%u'% (species, cc)
+            query = 'DROP TABLE IF EXISTS '+ dbases[cc-1]
+            print(query, file=sys.stderr)
+            curs.execute(query)
+        
+            query = ' CREATE TABLE ' + dbases[cc-1] + '''(
+            pos   INT    PRIMARY KEY,
+            genotype TEXT
+            conserved TEXT
+            )
+            '''
+            curs.execute(query)
+
+#####################################################################            
+# ORGANISM = 'Vitis_vinifera'
+# ORGANISM = 'TAIR10'
 
 col_names = ['chromosome', 'position', 'conserved', 'refAllele', 'contig', \
 'hit_from', 'hit_to', 'score', 'e_value']
 
 print(args.csvseparator.join(col_names))
-
+    
 fiter = fasta_iter(args.inFile)
 
 for ff in fiter:

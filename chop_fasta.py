@@ -1,7 +1,8 @@
 import sys
+import os
 from runshell import *
 
-#####################################################
+###############################################################################
 import argparse
 parser = argparse.ArgumentParser('''
 ''')
@@ -12,7 +13,10 @@ parser.add_argument("inFile",
 parser.add_argument("outFile", nargs='?', type=str, default='',
                     help="output file (.csv); for stdout type '-' ")
 
-parser.add_argument("-r", "--reference_fasta", type=str, default="../reference/Athaliana_Col0/TAIR10",
+parser.add_argument("-n", "--chunk_size", type=int, default=25,
+                    help="")                    
+
+parser.add_argument("-r", "--reference_fasta", type=str, default="../reference/TAIR10/TAIR10",
                     help="")     
                     
 parser.add_argument("-s", "--csvseparator", type=str, default= r';',
@@ -32,6 +36,8 @@ if not args.outFile == r'-':
 ###############################################################################
 header = 'chromosome; position;\n'
 snp_table = '1; 20;\n 1; 100;\n 1; 120;\n 1; 340;'.split('\n')
+
+assert os.path.isfile( args.reference_fasta)
 in_fas_file  = args.reference_fasta
 in_bed_file  = 'test.bed'
 out_fas_file = 'test.fa.out'
@@ -59,22 +65,34 @@ with open(args.inFile) as f:
     for line in f:     
 
         lineVals = line.split(args.csvseparator)
-        # print(lineVals)
     
         chromosome = int(lineVals[0])
         chrom_str = 'Chr%u' % chromosome
     
         snp_position = int(lineVals[1])
-        region_start = max(1, snp_position - FLANK)
-        region_end = snp_position + FLANK
+        region_start = max(1, snp_position - args.chunk_size)
+        region_end = snp_position + args.chunk_size
         # chr2:1,000,000-2,000,000
         chrm_range = chrom_str+':'+ '%u' % region_start + '-'+'%u' % region_end
     
         out, err = chop_cmd(chrm_range)
     
-        out_lines = out.decode('utf-8').split('\n')
+        out_lines = out.split('\n')
         out_lines[0] = '>'+chrom_str+':%u' % snp_position
-    
+        
+        # print(out_lines, file=sys.stderr) 
+        tot_size = 2*args.chunk_size + 1
+        if len(out_lines[1]) < tot_size :
+            out_lines[1] = 'N'* (len(out_lines[1]) - tot_size) + out_lines[1]
+            
         out_decoded =  '\n'.join(out_lines) # python3
-        print(out_decoded)
+        print(out_decoded[:-1])
+
+#####################################################################
+
+print('finished successfully',  file=sys.stderr) 
+        
+if not args.outFile == r'-':
+    sys.stdout.close()
     
+sys.stdout = sys.__stdout__
