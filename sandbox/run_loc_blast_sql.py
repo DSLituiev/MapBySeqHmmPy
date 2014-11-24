@@ -1,3 +1,4 @@
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 """
 Created on Thu Nov 20 14:00:11 2014
@@ -9,6 +10,7 @@ import os
 import xml.dom.minidom  
 # import xml.etree.ElementTree as ET
 from fasta_tools import *
+import sqlite3
 ###############################################################################
 import argparse
 parser = argparse.ArgumentParser('''
@@ -17,8 +19,8 @@ parser = argparse.ArgumentParser('''
 parser.add_argument("inFile",
                    help="input file (.fasta/.fas) with the gene IDs given in the 'geneID' column")        
 
-parser.add_argument("outFile", nargs='?', type=str, default='',
-                    help="output file (.csv); for stdout type '-' ")
+parser.add_argument("-d", "--dbPath", default = '/home/dima/scripts/snpdb/vcf.db',
+                    help="a path to the database")
 
 parser.add_argument("-r", "--reference_fasta", type=str, default="../reference/TAIR10/TAIR10",
                     help="")     
@@ -32,16 +34,6 @@ parser.add_argument("-s", "--csvseparator", type=str, default= r';',
 args = parser.parse_args()
 
 ORGANISM = args.species
-###############################################################################
-if not args.outFile == r'-':
-    if not args.outFile == r'':
-        sys.stdout = open(args.outFile, 'w')
-    else:
-        import re
-        outFile = re.sub(r'\.fa.+', '-conservation_'+ ORGANISM + '.csv', args.inFile)
-        assert(not outFile==args.inFile)
-        sys.stdout = open(outFile, 'w')
-        print('output file: %s' % outFile,  file=sys.stderr) 
 
 ###############################################################################
 try:
@@ -136,71 +128,147 @@ def compare_alignments(xml_string, LOC_IND):
     return (mathched_flag, q_allele, contig, hsp_fields)
 
 #####################################################################
-def initializeSnpTable(conn, species, chrNumber = 5):
+class conservation_tables():
+    table_template = 'Conservation_%s_%u'
+    colNum = 8
     
-    dbases = [''] * chrNumber
     
-    with conn:
-        curs = conn.cursor()
+    def __init__(self, dbPath, species, chrNumber = 5, purge = False):
+        self.conn = sqlite3.connect(dbPath)
+        self.chrs_tables = [''] * chrNumber
+        self.species = species
+        if purge:
+            self.insert_query = 'INSERT INTO ' + self.table_template + ' VALUES ('+ ','.join(['?']*self.colNum) +')'
+        else:
+            self.insert_query = 'INSERT OR IGNORE INTO ' + self.table_template + ' VALUES ('+ ','.join(['?']*self.colNum) +')'
         
-        for cc in range(1,chrNumber+1):
-            dbases[cc-1] = 'Conservation_%s_%u'% (species, cc)
-            query = 'DROP TABLE IF EXISTS '+ dbases[cc-1]
-            print(query, file=sys.stderr)
-            curs.execute(query)
-        
-            query = ' CREATE TABLE ' + dbases[cc-1] + '''(
-            pos   INT    PRIMARY KEY,
-            genotype TEXT
-            conserved TEXT
-            )
-            '''
-            curs.execute(query)
+        with self.conn:
+            curs = self.conn.cursor()
+            
+            for cc in range(1,chrNumber+1):
+                self.chrs_tables[cc-1] = self.table_template % (self.species, cc)
+                
+                if purge:
+                    query = 'DROP TABLE IF EXISTS '+ self.chrs_tables[cc-1]
+                    print(query, file=sys.stderr)
+                    curs.execute(query)
 
+                query = ' CREATE TABLE if not exists ' + self.chrs_tables[cc-1] + '''(
+                pos   INT    PRIMARY KEY,            
+                conserved INT,
+                refAllele TEXT,
+                contig TEXT,
+                hit_from INT,
+                hit_to INT,
+                score INT,
+                e_value REAL
+                )
+                '''
+                curs.execute(query)
+                
+    def __del__(self):
+        self.conn.close()
+        
+    def populateSnpTable(self, theIter):
+         
+        self.conn.isolation_level = None
+        
+        with self.conn:
+            curs = self.conn.cursor()
+            try:
+                curs.execute("begin")
+                for cons_obj in theIter:
+                    entry = cons_obj.get_content()
+                    assert len(entry) == self.colNum+1, 'number of columns mismatch'      
+                    chromosome = int(entry[0][3])
+                    query = self.insert_query % (self.species, chromosome)
+                    curs.execute(query, entry[1:])
+                curs.execute("commit")
+            
+            except self.conn.Error as ee:
+                    print("failed to write to the database!")
+                    curs.execute("rollback")
+                    raise ee
+
+#####################################################################
+class conservation_from_fasta():
+    _col_names_ = ['chromosome', 'position', 'conserved', 'refAllele', 'contig', \
+            'hit_from', 'hit_to', 'score', 'e_value']
+             
+    def __init__(self, *args):
+        if len(args)>=2:
+            ff, ORGANISM = args
+        else:
+            return
+        headerStr, seq = ff
+        (self.cc, self.pp) = headerStr.split(':')
+        LOC_IND = int(len(seq)//2)+1
+        self.ref_allele = seq[LOC_IND]
+        out, err = run_blast(seq, ORGANISM)    
+        out_lines = out.split('\n')
+        """
+        out_plain, err = run_blast(seq, ORGANISM, '1')    
+        print(out_plain[182:] , file=sys.stderr) 
+        print("______________________________________", file=sys.stderr) 
+        """
+       
+        self.mathched_flag, self.q, self.contig, self._hsp_fields_ = compare_alignments(out, LOC_IND)
+
+        for kk in self._hsp_fields_:
+            print(kk + '\t' + self._hsp_fields_[kk] , file=sys.stderr) 
+        print("______________________________________", file=sys.stderr) 
+            
+        assert (not self.mathched_flag) or (self.ref_allele == self.q), 'reference allele mismatch'
+        
+        if len(self._hsp_fields_)>0:
+            self.hit_from = self._hsp_fields_['Hsp_hit-from']
+            self.hit_to   = self._hsp_fields_['Hsp_hit-to']        
+            self.score    = self._hsp_fields_['Hsp_score']
+            self.evalue   = self._hsp_fields_['Hsp_evalue']
+        else:
+            self.hit_from = 0
+            self.hit_to = 0
+            self.score = 0
+            self.evalue = 1.0            
+        return
+        
+    def get_content_order(self):
+        return self._col_names_
+
+    def get_content(self):
+        return (self.cc, self.pp, int(self.mathched_flag), self.ref_allele, self.contig, 
+                self.hit_from, self.hit_to, self.score, self.evalue)
+
+    def print_content(self,  *args, **kwargs):
+        print( *(self.get_content() + args), **kwargs)
+                
 #####################################################################            
-# ORGANISM = 'Vitis_vinifera'
-# ORGANISM = 'TAIR10'
+class fasta_to_conserv():
+    
+    def __init__(self, inFile, ORGANISM):
+        self.fasta_iter = fasta_iter(inFile)
+        self.organism = ORGANISM
 
-col_names = ['chromosome', 'position', 'conserved', 'refAllele', 'contig', \
-'hit_from', 'hit_to', 'score', 'e_value']
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        ff = self.fasta_iter.__next__()
+        cons = conservation_from_fasta(ff, self.organism)
+        return cons
+#####################################################################
+cons = conservation_from_fasta()
+col_names = cons.get_content_order()
 
 print(args.csvseparator.join(col_names))
     
-fiter = fasta_iter(args.inFile)
+fasta_iterator = fasta_to_conserv(args.inFile, ORGANISM)
 
-for ff in fiter:
-    headerStr, seq = ff
-    (cc, pp) = headerStr.split(':')
-    LOC_IND = int(len(seq)//2)+1
-    ref_allele = seq[LOC_IND]
-    out, err = run_blast(seq, ORGANISM)    
-    out_lines = out.split('\n')
-    
-    """
-    out_plain, err = run_blast(seq, ORGANISM, '1')    
-    print(out_plain[182:] , file=sys.stderr) 
-    print("______________________________________", file=sys.stderr) 
-    """
-    mathched_flag, q, contig, hsp_fields = compare_alignments(out, LOC_IND)
-         
-    for kk in hsp_fields:
-        print(kk + '\t' + hsp_fields[kk] , file=sys.stderr) 
-    print("______________________________________", file=sys.stderr) 
-        
-    assert (not mathched_flag) or (ref_allele == q), 'reference allele mismatch'
-    if len(hsp_fields)>0:
-        print(cc, pp, mathched_flag, ref_allele, contig, 
-              hsp_fields['Hsp_hit-from'], hsp_fields['Hsp_hit-to'],
-              hsp_fields['Hsp_score'], hsp_fields['Hsp_evalue'],
-              sep = args.csvseparator)
-    else:
-         print(cc, pp, mathched_flag, ref_allele, contig, 
-              sep = args.csvseparator)
+cons_table = conservation_tables(args.dbPath, ORGANISM)
+cons_table.populateSnpTable( fasta_iterator)
+
 #####################################################################
 
 print('finished successfully',  file=sys.stderr) 
-        
-if not args.outFile == r'-':
-    sys.stdout.close()
-    
+
 sys.stdout = sys.__stdout__
