@@ -7,6 +7,7 @@ Created on Fri Nov 21 11:27:49 2014
 
 from itertools import groupby
 
+
 def fasta_iter(fasta_name):
     """
     By Brent Pedersen

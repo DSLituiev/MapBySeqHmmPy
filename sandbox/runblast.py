@@ -10,12 +10,12 @@ from runshell import *
 
 ORGANISM = 'Vitis'
 
-#ORGANISM = 'Arabidopsis'
+# ORGANISM = 'Arabidopsis'
 FMT = '"2 scomnames stitle"'
 fasta_str = ' "CATTTGTTATATTGGATACAAGCTTTGCTACGATCTACATTTGGGAATGTGAGTCTCTTA" '
-cmd_blast = 'echo '+ fasta_str + ' | ' + \
-'blastn -db nr -entrez_query "' + ORGANISM + '[Organism]" -evalue 1e-3 -num_alignments 5 -outfmt ' + FMT
-out, err = runcmd( cmd_blast  )
+cmd_blast = 'echo ' + fasta_str + ' | ' + \
+            'blastn -db nr -entrez_query "' + ORGANISM + '[Organism]" -evalue 1e-3 -num_alignments 5 -outfmt ' + FMT
+out, err = runcmd(cmd_blast)
 out_lines = out.decode('utf-8').split('\n')
 print('\n'.join(out_lines))
 
