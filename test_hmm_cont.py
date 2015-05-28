@@ -39,16 +39,17 @@ class hmm_cont_test(unittest.TestCase):
     
     def test_calc_stationary(self):
         print('----------------------------------------------------------------------')
-        (x_p_stat, xk_p_stat) = HMM.getLikelihoodOfAModel(self.HMM.hidstates.Pstat)
+        (x_p_stat, xk_p_stat) = self.HMM.getLikelihoodOfAModel(self.HMM.hidstates.Pstat)
         
         print('number of loci / points %u' %  len(x_p_stat))
+        print('stationary model lh:')
         print(x_p_stat)
         assert (abs(x_p_stat + np.mean(x_p_stat)) < 5e-2).all(), \
         "the stationary distribution is too different at different points"
 
     def test_symmetry(self):
         print('----------------------------------------------------------------------')
-        x = np.arange(0,21)
+        x = np.arange(0,8)
         M = len(x)
         
         r = [21,] *M
@@ -59,6 +60,9 @@ class hmm_cont_test(unittest.TestCase):
         a = hmm_cont(pop, p_bin, x)
         
         (xL, xkL) = a.getLikelihoodOfAModel(pop.Psel)
+        
+        print('selection model lh:')
+        print( xL )
         
         diffr = (xL - xL[::-1])
         assert all( diffr < 1e-12 )
