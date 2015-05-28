@@ -20,21 +20,25 @@ s = sim_pool_seq(population_size=4, reads_expected=30, n_sampling_points=20,
                  t_causative=0.5)
 s.generate_path()
 ###############################################################################
+POP_SIZE = 10
+
 VERBOSE = False
-x = np.arange(0,21)
+x = np.arange(0,1, 0.02)
 x0 = 3
 x1 = 16
 dx0 = 0.1
 dx1 = 0.05
-x = np.concatenate( (x[0:x0] , x0 + np.arange(0, 1, dx0), 
-                     x[x0+1:x1], x1 + np.arange(0, 1, dx1), x[x1+1:]) )
+#x = np.concatenate( (x[0:x0] , x0 + np.arange(0, 1, dx0), 
+#                     x[x0+1:x1], x1 + np.arange(0, 1, dx1), x[x1+1:]) )
 
 dx, log10_dx = min_distances(x)
 membership, mixtObj, iTrue, out_mode_number, _ = unmix(log10_dx)
     
 M = len(x)
-II = 500
+II = 200
 ixL = np.empty((II, M))
+enL = np.empty((II, M))
+
 
 for ii in range(0, II):
 #    r = [21,] *M
@@ -50,21 +54,23 @@ for ii in range(0, II):
         print('q: ' , end = '')
         print(q)
     
-    pop = population(5)
+    pop = population(POP_SIZE)
     p_bin = binom.pmf(q, r, pop.f_vect)
     
     a = hmm_cont(pop, p_bin, x)
     
     (xL, xkL) = a.getLikelihoodOfAModel(pop.Psel)
     ixL[ii,:] = xL
+    enL[ii,:] = a.entropy()
 
 
 import matplotlib.pyplot as plt
 
 ###############################################################################
+a.plot_raw_lh()
 
 plt.figure()
-plt.plot(x, len(x) * [np.mean(ixL[:,1:-2][:,dx[1:-2] == 1].ravel() ),] , 'g-', 
+plt.plot(x, len(x) * [np.mean(ixL[:,1:-2][:,dx[1:-2] == max(dx)].ravel() ),] , 'g-', 
     linewidth = 0.5, label = 'mean of all')
 plt.plot(x, np.mean(ixL, 0), 'r-', label = 'mean')
 plt.plot(x, np.min(ixL, 0), 'k-', linewidth = 0.5, label = 'min')
@@ -76,3 +82,10 @@ plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1),
 plt.show()
 
 ###############################################################################
+from scipy.stats import entropy
+
+en = a.entropy()
+
+plt.figure()
+plt.plot(x, en, 'b.-', linewidth = 0.4, markersize = 1, label = 'sample')
+plt.plot(x, np.mean(enL,0), 'r-', label = 'mean')

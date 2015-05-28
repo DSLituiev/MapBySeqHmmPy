@@ -1,4 +1,7 @@
+MO
+reference/**/*
 **/*.csv
 **/*.tmp
 **/*~
 __pycache__/**/*
+.idea/

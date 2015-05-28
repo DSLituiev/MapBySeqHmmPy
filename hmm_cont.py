@@ -153,13 +153,13 @@ class hmm_cont:
             self.crossMatr(linkage_loosening);
             self.cumMatr();
 
-        " + log-emission !!!"
         self.xk_P_flat = self.logAlpha + self.logBeta
         # log10(self.Pz);
 
         # self.x_P_flat = calcMarginal(self.xkPout, axis = 1);
         if np.isnan(self.xk_P_flat).any():
             warnings.warn('some entries in the probability matrix are NaN!')
+            # exception('all entries in the probability vector are NaN!')
 
         if np.isnan(self.xk_P_flat).all():
             raise ErrorAllNaNs
@@ -170,7 +170,29 @@ class hmm_cont:
         else:
             return self.xk_P_flat
 
-            # exception('all entries in the probability vector are NaN!')
+    def plot_raw_lh(self, *args, **kwargs):
+        "plot raw likelihood as a pseudocoloured surface"
+        if len(args) > 0 or len(kwargs) > 0:
+            if len(args)>1:
+                args[1] = None
+            if 'prior' in kwargs:
+                kwargs.pop('prior')
+            self._runFB_( *args, **kwargs )
+             
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        fig.suptitle('raw likelihoods')
+        ax = fig.add_subplot(111)
+        ax.pcolor(self.t,  self.hidstates.k_vect.ravel()[~np.any(np.isinf(self.xk_P_flat),1)], 
+                  self.xk_P_flat[~np.any(np.isinf(self.xk_P_flat),1),:] )
+        plt.show()
+        return fig
+        
+    def entropy(self, base = 2):
+        from scipy.stats import entropy
+        en = entropy(self.xk_P_flat[~np.any(np.isinf(self.xk_P_flat),1),:],  
+                    base = base)
+        return en
 
     def getLikelihoodOfAModel(self, model_P_z):
         # assert hasattr(self, 'Pz') ,'no distribution over the hidden states has been submitted!'

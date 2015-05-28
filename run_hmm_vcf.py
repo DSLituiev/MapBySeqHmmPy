@@ -36,7 +36,7 @@ pos_cond = generate_pos_query_condition(intervals)
 sr = SnpReadsData(dbPath, dbName, N)
 sr.check_data_tables()
 
-cc = 2
+cc = 1
 sr.read_chromosome(cc, '(totCount >=5) AND (altCount >= 3)')
 sr[cc].add_membership()
 sr[cc].plot_snp_density(cc, threshold=2, grid=False);
@@ -74,6 +74,8 @@ fig.suptitle('probability of selection')
 ax.plot(sr[cc]['x'] * 1e-6, p_out, 'r*-', label='without crowded')
 plt.show()
 ###############################################################################
+p_flat = sr[cc].HMM.plot_raw_lh(linkage_loosening, fresh=True)
+
 ###############################################################################
 
 sr[cc].data = sr[cc].data[~y]

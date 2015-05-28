@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov  4 10:31:05 2014
-
-@author: Dmitri
+@author: Dmytro Lituiev
 """
 from population import *
 from hmm_cont import *
@@ -33,8 +32,8 @@ HMM = hmm_cont(pop, emission_handle(q, r), 0.01 * x)
 
 def test_calc_transition(HMM):
     HMM.calcT()
-    stat_prob_propagation = np.dot(HMM.pop.Pstat, HMM.Transition)
-    probab_error = np.linalg.norm(stat_prob_propagation - HMM.pop.Pstat)
+    stat_prob_propagation = np.dot(HMM.hidstates.Pstat, HMM.Transition)
+    probab_error = np.linalg.norm(stat_prob_propagation - HMM.hidstates.Pstat)
     assert (probab_error < 1e-12)
     print('calc_transition works well!')
 
@@ -43,12 +42,14 @@ test_calc_transition(HMM)
 
 HMM.cumMatr()
 
-HMM.runFBinternal()
+HMM._runFB_()
 
 HMM.xk_P_flat
 
 (x_p_stat, xk_p_stat) = HMM.getLikelihoodOfAModel(pop.Pstat)
-assert (abs(x_p_stat + 5.43) < 5e-2).all(), "the stationary distribution is distorted too much"
+
+assert (abs(x_p_stat + np.mean(x_p_stat)) < 5e-2).all(), \
+"the stationary distribution is distorted too much"
 
 x_p_flat, junk = HMM.getLikelihoodOfAModel(1 / pop.Np)
 

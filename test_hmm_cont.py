@@ -28,15 +28,26 @@ class hmm_cont_test(unittest.TestCase):
         self.HMM = hmm_cont(pop, emission_handle(q, r), 0.01 * x)
         print('setup completed')
 
-    def test_calc_transition(self):
+    def test_calc_transition_propagation(self):
+        print('----------------------------------------------------------------------')
         self.HMM.calcT()
         stat_prob_propagation = np.dot(self.HMM.hidstates.Pstat, self.HMM.Transition)
         probab_error = np.linalg.norm(stat_prob_propagation - self.HMM.hidstates.Pstat, np.inf)
         assert (probab_error < 1e-12)
         print('`calc_transition` works well on stationary distribution!')
         print('error: %2.2e' % probab_error)
+    
+    def test_calc_stationary(self):
+        print('----------------------------------------------------------------------')
+        (x_p_stat, xk_p_stat) = HMM.getLikelihoodOfAModel(self.HMM.hidstates.Pstat)
+        
+        print('number of loci / points %u' %  len(x_p_stat))
+        print(x_p_stat)
+        assert (abs(x_p_stat + np.mean(x_p_stat)) < 5e-2).all(), \
+        "the stationary distribution is too different at different points"
 
     def test_symmetry(self):
+        print('----------------------------------------------------------------------')
         x = np.arange(0,21)
         M = len(x)
         
