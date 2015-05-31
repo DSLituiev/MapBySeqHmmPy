@@ -116,32 +116,11 @@ class hmm_cont:
                'Replacing negative numbers by zeros']))
 
                 self.Transition.ravel()[self.Transition.ravel<0] = 0;
-    
-    def crossMatr(self):
-            assert isinstance(self.E, (np.ndarray, np.generic) ),  "provide emission matrices first!"
-          
-            if not (isinstance(self.Transition, (np.ndarray, np.generic) )):
-                """define transition matrix T first!"""
-                self.calcT() 
-                
-            resh_E = np.transpose(self.E[:, 0:self.M - 1][:,np.newaxis], (2,0,1))
-            resh_E.shape
-    
-            self.T_E_product = np.transpose( np.multiply( resh_E, self.Transition ), (0,2,1));
-            
-            plt.figure(num = 2)
-            plt.pcolor(self.TxE_A[:, 0, :])
-            
-            plt.figure(num = 3)
-            plt.pcolor(self.TxE_A[0, :, :])
-            
-            warnings.warn("non-zero entries for N=0")
-            # assert (self.TxE_A == 0)[:,:,0].all()
 
     def cumMatr(self, linkage_loosening=1.0):
         assert isinstance(self.Np, int), "please define the number of states (`Np`) first"
 
-        if not hasattr(self, 'T_E_product') or \
+        if not hasattr(self, 'TxE_A') or \
         not isinstance(self.TxE_A, (np.ndarray, np.generic)):
             """calculate the Transition-Emission product matrix first"""
             self.crossMatr();
