@@ -84,36 +84,36 @@ class hmm_cont:
         resh_E = np.transpose(self.E[:, 0:self.M - 1][:, np.newaxis], (2, 0, 1))
         resh_E.shape
 
-        self.TT_E_A = np.multiply(resh_E, np.transpose(self.Transition, (0, 2, 1)) );
-        self.T_E_B  = np.multiply(resh_E, self.Transition);
+        self.TxE_B  = np.multiply(resh_E, np.transpose(self.Transition, (0, 2, 1)) );
+        self.TxE_A = np.multiply(resh_E, self.Transition);
 
-        if not (self.TT_E_A == 0)[:, :, 0].all() and \
-        (self.TT_E_A == 0)[:, :, :-1].all():
+        if not (self.TxE_A == 0)[:, :, 0].all() and \
+        (self.TxE_A == 0)[:, :, :-1].all():
             print( 'non-zero entries: ')
-            print( np.where(self.TT_E_A[:, :, 0] != 0) )
-            tmp = self.TT_E_A[:, :, 0]
+            print( np.where(self.TxE_A[:, :, 0] != 0) )
+            tmp = self.TxE_A[:, :, 0]
             print( tmp[np.where(tmp != 0)] )
-            # print( np.where((self.TT_E_A == 0)[:, :, 0].all) )
+            # print( np.where((self.TxE_A == 0)[:, :, 0].all) )
             
             import matplotlib.pyplot as plt
             plt.figure(num = 1)
-            plt.pcolor(self.TT_E_A[:, :, 0])
+            plt.pcolor(self.TxE_A[:, :, 0])
             
             
             plt.figure(num = 2)
-            plt.pcolor(self.TT_E_A[:, 0, :])
+            plt.pcolor(self.TxE_A[:, 0, :])
             
             plt.figure(num = 3)
-            plt.pcolor(self.TT_E_A[0, :, :])
+            plt.pcolor(self.TxE_A[0, :, :])
             
             warnings.warn("non-zero entries for N=0")
-            # assert (self.TT_E_A == 0)[:,:,0].all()
+            # assert (self.TxE_A == 0)[:,:,0].all()
 
     def cumMatr(self, linkage_loosening=1.0):
         assert isinstance(self.Np, int), "please define the number of states (`Np`) first"
 
         if not hasattr(self, 'T_E_product') or \
-        not isinstance(self.TT_E_A, (np.ndarray, np.generic)):
+        not isinstance(self.TxE_A, (np.ndarray, np.generic)):
             """calculate the Transition-Emission product matrix first"""
             self.crossMatr(linkage_loosening);
 
@@ -126,14 +126,15 @@ class hmm_cont:
         scaleA = np.zeros(self.M);
 
         for m in range(self.M - 2, -1, -1):
-            aCumul = np.dot(aCumul, self.TT_E_A[m, :, :].T) * 10 ** (scaleA[m + 1] - scalePrev)
+            order_of_magnitude = 10 ** (scaleA[m + 1] - scalePrev) 
+            aCumul = np.dot(self.TxE_A[m, :, :], aCumul ) * order_of_magnitude 
             self.logAlpha[:, m] = np.log10(aCumul) - scaleA[m + 1];
             scalePrev = scaleA[m + 1];
             scaleA[m] = - max(self.logAlpha[:, m]);
 
         """backward"""
         self.logBeta = -float('inf') * np.ones(( self.Np, self.M));
-        # self.Transition[ 0].T * self.E[:,0] - self.TT_E_A[0]
+        # self.Transition[ 0].T * self.E[:,0] - self.TxE_A[0]
         bCumul =  np.ones(self.Np) # self.E[:, 0] # 
         self.logBeta[:, 0] =  np.log10(bCumul);
 
@@ -141,7 +142,8 @@ class hmm_cont:
         scaleB = np.zeros(self.M)
 
         for m in range(1, self.M):
-            bCumul = np.dot(bCumul, self.T_E_B[m - 1, :, :]) * 10 ** (scaleB[m - 1] - scalePrev)
+            order_of_magnitude = 10 ** (scaleB[m - 1] - scalePrev)
+            bCumul = np.dot(bCumul * order_of_magnitude, self.TxE_B[m - 1, :, :]) 
             self.logBeta[:, m] = np.log10(bCumul) - scaleB[m - 1]
             scalePrev = scaleB[m - 1];
             scaleB[m] = - max(self.logBeta[:, m]);
@@ -201,7 +203,7 @@ class hmm_cont:
             
         if not hasattr(self, 'xk_P_flat'):
             self._runFB_()
-            
+        
         xk_P_out = self.xk_P_flat + np.log10(model_P_z)[np.newaxis].T
         x_P_out = calcMarginal(xk_P_out, axis=0)
         return (x_P_out, xk_P_out)
