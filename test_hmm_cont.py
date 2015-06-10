@@ -105,7 +105,7 @@ class hmm_cont_test(unittest.TestCase):
     
     def test_calc_stationary(self):
         print('----------------------------------------------------------------------')
-        (x_p_stat, xk_p_stat) = self.HMM.getLikelihoodOfAModel(self.HMM.hidstates.Pstat)
+        (x_p_stat, xk_p_stat) = self.HMM.get_model_likelihood(self.HMM.hidstates.Pstat)
         
         print('number of loci / points %u' %  len(x_p_stat))
         print('stationary model log-lh:')
@@ -126,13 +126,13 @@ class hmm_cont_test(unittest.TestCase):
         p_bin = binom.pmf(q, r, pop.f_vect)
         
         a = hmm_cont(pop, p_bin, x)
-        (xL, xkL) = a.getLikelihoodOfAModel(pop.Psel)
+        (xL, xkL) = a.get_model_likelihood(pop.Psel)
         
         print('selection model lh:')
         print( xL )
         
         diffr = (xL - xL[::-1])
-        assert all( diffr < 1e-12 )
+        assert all( diffr / np.mean(xL) < self.relTolerance )
         print( 'max difference: %2.2e' % (max(diffr)) )
         
 if __name__ == "__main__":
