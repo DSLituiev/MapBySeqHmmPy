@@ -12,7 +12,20 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator
 import matplotlib.pyplot as plt
 
-
+def full_chr_name_athaliana(chromosome_n):
+    chrnames = ['Chr1', 'Chr2', 'Chr3', 'Chr4', 'Chr5', 'chloroplast', 'mitochondria']
+    if (type(chromosome_n) is str) and len(chromosome_n) == 1:
+        chromosome_n = int(chromosome_n)
+    
+    if type(chromosome_n) is int:
+        chromosome_name = chrnames[chromosome_n-1]
+    elif chromosome_n in chrnames:
+        chromosome_name = chromosome_n
+    else:
+        chromosome_name = None
+        raise KeyError('chromosome %s is not found in the data.' % chromosome_n)
+    return chromosome_name
+    
 class GeneticMap:
     "the genetic distances are stored in Morgans (not cM, i.e. Morgans = cM/100)"
 
@@ -21,8 +34,8 @@ class GeneticMap:
         self._initialize_arrays_()
         self._read_table_(file_path)
         "assert that the map points are non-decreasing"
-        for cc in range(len(self._phys_pos_)):
-            assert (np.diff(self._phys_pos_[cc]) > 0).all(), "decreasing values found!"
+        for kk in self._phys_pos_:
+            assert (np.diff( self._phys_pos_[kk] ) > 0).all(), "decreasing values found!"
 
         print('initialization of the genetic map is completed', file=sys.stderr)
 
@@ -42,41 +55,52 @@ class GeneticMap:
 
     def _initialize_arrays_(self):
         "the first entry must be zero in each array: allocate a spare entry for it"
-        self._phys_pos_ = []
-        self._gen_pos_ = []
-        for nn in self._num_lines_:
+        self._phys_pos_ = {}
+        self._gen_pos_ = {}
+        for ii in range(len(self._num_lines_)):
             # print(nn)
-            self._phys_pos_.append(np.zeros((1 + nn,), dtype=int))
-            self._gen_pos_.append(np.zeros((1 + nn,)))
+            nn = self._num_lines_[ii]
+            self._phys_pos_[full_chr_name_athaliana(ii+1)] = np.zeros((1 + nn,), dtype=int)
+            self._gen_pos_[full_chr_name_athaliana(ii+1)] = np.zeros((1 + nn,))
 
     def _read_table_(self, file_path):
         " "
         ii = 1
         with open(file_path) as fi:
             header = next(fi)
-            chromosome = -1
+            chromosome = ''
             for line in fi:
                 lspl = line.split(';')
-                if not (chromosome == int(lspl[1])):
-                    chromosome = int(lspl[1])
+                curr_chr_name = full_chr_name_athaliana(lspl[1])
+                if not (chromosome == curr_chr_name):
+                    chromosome = curr_chr_name
                     ii = 1
-                self._phys_pos_[chromosome - 1][ii] = (int(lspl[3]) + int(lspl[4])) // 2
-                self._gen_pos_[chromosome - 1][ii] = 0.01 * float(lspl[5])
+                self._phys_pos_[chromosome][ii] = (int(lspl[3]) + int(lspl[4])) // 2
+                self._gen_pos_[chromosome][ii] = 0.01 * float(lspl[5])
                 ii += 1
         return
 
-    def visualise_map(self, cc=1):
-        plt.plot(self._phys_pos_[cc - 1], self._gen_pos_[cc - 1], 'o-')
+    def _visualise_map_chr_(self, cc):
+        plt.plot(self._phys_pos_[cc], self._gen_pos_[cc], 'o-')
         plt.show()
+        
+    def visualise_map(self, cc=None):
+        if not cc is None:
+            self._visualise_map_chr_(cc)
+        else:
+            for cc in self._phys_pos_:
+                self._visualise_map_chr_(cc)
 
     def interpolate(self, phys_x, chromosome):
         " note that the interpolation scheme does not guarantee non-decreasing output"
-
+        if not (chromosome in self._phys_pos_):
+            return None
+        
         NUM_LAST_POINTS = 5
         assert (np.diff(phys_x) > 0).all(), "decreasing input values found!"
         "using  Piecewise Cubic Hermite Interpolating Polynomial"
-        ipf = PchipInterpolator(self._phys_pos_[chromosome - 1], \
-                                self._gen_pos_[chromosome - 1], extrapolate=False)
+        ipf = PchipInterpolator(self._phys_pos_[chromosome], \
+                                self._gen_pos_[chromosome], extrapolate=False)
         gen_x = ipf(phys_x)
 
         nan_inds, = np.where(gen_x != gen_x)
@@ -120,20 +144,20 @@ class GeneticMap:
         return gen_x
 
     def _last_x_(self, chromosome):
-        return self._phys_pos_[chromosome - 1][-1]
+        return self._phys_pos_[chromosome][-1]
 
     def _last_inds_(self, chromosome, phys_x):
-        li = phys_x > self._phys_pos_[chromosome - 1][-2]
-        li = li & ( phys_x < self._phys_pos_[chromosome - 1][-1])
+        li = phys_x > self._phys_pos_[chromosome][-2]
+        li = np.array(li & ( phys_x < self._phys_pos_[chromosome][-1]))
         return li
 
     def _hanging_inds_(self, chromosome, phys_x):
-        hi = phys_x > self._phys_pos_[chromosome - 1][-1]
-        return hi
+        hi = phys_x > self._phys_pos_[chromosome][-1]
+        return np.array(hi)
 
     def _scale_(self, chromosome):
-        return self._phys_pos_[chromosome - 1][-1] - \
-               self._phys_pos_[chromosome - 1][-2]
+        return self._phys_pos_[chromosome][-1] - \
+               self._phys_pos_[chromosome][-2]
 
     def _weight_(self, scale, x):
         return np.exp2(- (x / scale / 2) ** 2)
@@ -146,8 +170,8 @@ class GeneticMap:
         return lambda x: self._weight_(self._scale_(chromosome), x - self._last_x_(chromosome))
 
     def _fit_last_points_(self, chromosome, num_last_points=5):
-        fit = np.polyfit(self._phys_pos_[chromosome - 1][-num_last_points:], \
-                         self._gen_pos_[chromosome - 1][-num_last_points:], 1)
+        fit = np.polyfit(self._phys_pos_[chromosome][-num_last_points:], \
+                         self._gen_pos_[chromosome][-num_last_points:], 1)
         line = np.poly1d(fit)
         return line
 

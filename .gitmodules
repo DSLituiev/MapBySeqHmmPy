@@ -1,0 +1,3 @@
+[submodule "plot_contigs"]
+	path = plot_contigs
+	url = https://github.com/DSLituiev/plot_contigs

@@ -69,7 +69,7 @@ class hmm_cont:
 
             self.Transition.ravel()[self.Transition.ravel < 0] = 0;
 
-    def crossMatr(self, linkage_loosening=1.0):
+    def crossMatr(self, linkage_loosening = 1.0):
         assert isinstance(self.E, (np.ndarray, np.generic)), "provide emission matrices first!"
 
         if not hasattr(self, 'Transition') or \
@@ -117,13 +117,13 @@ class hmm_cont:
 
                 self.Transition.ravel()[self.Transition.ravel<0] = 0;
 
-    def cumMatr(self, linkage_loosening=1.0):
+    def cumMatr(self, linkage_loosening = 1.0):
         assert isinstance(self.Np, int), "please define the number of states (`Np`) first"
 
         if not hasattr(self, 'TxE_A') or \
         not isinstance(self.TxE_A, (np.ndarray, np.generic)):
             """calculate the Transition-Emission product matrix first"""
-            self.crossMatr();
+            self.crossMatr(linkage_loosening);
         
         self.logAlpha = -float('inf') * np.ones( ( self.Np, self.M) );
         self.logBeta  = -float('inf') * np.ones( ( self.Np, self.M) );
@@ -160,9 +160,10 @@ class hmm_cont:
         
         return
 
-    def _runFB_(self):
-            if not hasattr(self, 'T_E_product') or not hasattr(self, 'logAlpha' ) or not hasattr(self, 'logBeta' ) :
-                self.crossMatr();
+    def _runFB_(self, linkage_loosening = 1.0, fresh = False):
+            if fresh or not hasattr(self, 'TxE_A') or \
+            not hasattr(self, 'logAlpha' ) or not hasattr(self, 'logBeta' ):
+                self.crossMatr(linkage_loosening);
                 self.cumMatr();
             
             self.xk_P_flat = self.logAlpha + self.logBeta 
@@ -176,15 +177,43 @@ class hmm_cont:
                 raise ErrorAllNaNs
                 # exception('all entries in the probability vector are NaN!')
     
-    def getLikelihoodOfAModel(self, model_P_z):
+    def get_model_likelihood(self, prior, linkage_loosening=1.0, fresh = False):
+        # former getLikelihoodOfAModel
+        self.linkage_loosening = linkage_loosening
+        if type(prior) is str:
+            prior = getattr(self.hidstates, prior)
+        
         # assert hasattr(self, 'Pz') ,'no distribution over the hidden states has been submitted!'
-        assert (isinstance(model_P_z, float)) or (len(model_P_z) == self.hidstates.Np) , \
+        assert (isinstance(prior, float)) or (len(prior) == self.hidstates.Np) , \
         'a wrong distribution over the hidden states z_m is submitted!'
         
         if not hasattr(self, 'xk_P_flat'):
-            self._runFB_()
+            self._runFB_(linkage_loosening = linkage_loosening, fresh=fresh)
         
-        xk_P_out = self.xk_P_flat + np.log10(model_P_z)[np.newaxis].T
+        xk_P_out = self.xk_P_flat + np.log10(prior)[np.newaxis].T
         x_P_out = calcMarginal(xk_P_out, axis = 0)
         return (x_P_out, xk_P_out)
  
+    def plot_raw_lh(self, *args, **kwargs):
+        "plot raw likelihood as a pseudocoloured surface"
+        if len(args) > 0 or len(kwargs) > 0:
+            if len(args)>1:
+                args[1] = None
+            if 'prior' in kwargs:
+                kwargs.pop('prior')
+            self._runFB_( *args, **kwargs )
+             
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        fig.suptitle('raw likelihoods')
+        ax = fig.add_subplot(111)
+        ax.pcolor(self.t,  self.hidstates.k_vect.ravel()[~np.any(np.isinf(self.xk_P_flat),1)], 
+                  self.xk_P_flat[~np.any(np.isinf(self.xk_P_flat),1),:] )
+        plt.show()
+        return fig
+        
+    def entropy(self, base = 2):
+        from scipy.stats import entropy
+        en = entropy(self.xk_P_flat[~np.any(np.isinf(self.xk_P_flat),1),:],  
+                    base = base)
+        return en

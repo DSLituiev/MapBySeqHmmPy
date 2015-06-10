@@ -4,84 +4,26 @@ Created on Tue Jan 20 20:37:51 2015
 
 @author: dima
 """
+import weakref
+import numpy as np
+import pandas as pd
 
 import sys
-
 sys.path.append('../../snpdb/')
 from snp_tables import *
+
 from genetic_map import *
-import weakref
+from chromosome_length import ChromosomeLength
 
 from unmix_repeats import *
 from population import *
 from hmm_cont import *
-from scipy.stats import binom
-import numpy as np
-
-
-def close(series, ele):
-    series = dilate(series, ele)
-    series = erode(series, ele)
-    return series
-
-
-def dilate(series, ele):
-    new_series = np.copy(series)
-    for n in range(len(series)):
-        new_series[n] = max(series[max(0, n - ele):min(len(series), n + ele + 1)])
-    return new_series
-
-
-def erode(series, ele):
-    new_series = np.copy(series)
-    for n in range(len(series)):
-        new_series[n] = min(series[max(0, n - ele):min(len(series), n + ele + 1)])
-    return new_series
-
+from binomial_emission import *
+from snp_density import *
 
 # f = q/r;
-def binomial_emission(pop, q, r):
-    return binom.pmf(q, r, pop.f_vect)
-
-
-def binomial_uniform_emission(pop, q, r, membership=None):
-    p_bin = binom.pmf(q, r, pop.f_vect)
-    if membership is None:
-        return p_bin
-    else:
-        assert (membership.shape == q.shape), "dimension mismatch"
-
-        out_emission = membership * p_bin + (1 - membership) * (np.sum(p_bin, axis=0) / pop.Np)
-        assert (out_emission >= 0).all(), "negative values in the emission matrix!"
-        # assert (out_emission <= 1).all()
-        # assert ( abs(np.sum(out_emission , axis = 0)-1) < 1e-20).all()
-        return out_emission
-
 
 ###############################################################################
-class ChromosomeLength:
-    def __init__(self, path):
-        self.L_dict = {}
-        self.L = []
-        with open(path) as fi:
-            for line in fi:
-                cols = line.split('\t')
-                chr_length = int(cols[1])
-                self.L_dict[cols[0].split(' ')[0]] = chr_length
-                self.L.append(chr_length)
-
-    def __getitem__(self, chromosome):
-        return self.L[chromosome - 1]
-
-    def __repr__(self):
-        st = 'chromosome lengths:\n'
-        for nn, ll in enumerate(self.L):
-            st += '%u\t%u\n' % (nn + 1, ll)
-        return st
-
-    __str__ = __repr__
-
-
 ###############################################################################
 def check_str_array_field(data, field):
     for s in data.__array_interface__['descr']:
@@ -120,27 +62,36 @@ class SnpReadsDbChr():
 
     def _read_input_table_(self, condition_=''):
         self.membership_set = False
-        if self.column_exists('membership'):
-            res = self.parent().db_table.selectPositionArray(self.chromosome_name, \
-                                                             pos='*', columns='pos, altCount, totCount, membership',
-                                                             condition_=condition_)
-        else:
-            res = self.parent().db_table.selectPositionArray(self.chromosome_name, \
-                                                             columns='pos, altCount, totCount', condition_=condition_)
-            # self.x = res[:,0]
-        #        self.q = res[:,1]
-        #        self.r = res[:,2]
-        #        self.f = self.q/self.r
-        print('shape: ', res.shape)
-        self.data = np.empty(res.shape[0],
-                             dtype=[('x', 'i4'), ('q', 'i4'), ('r', 'i4'), ('dx', 'i4'), ('membership', 'f4')])
-        self.data['x'] = res[:, 0]
-        self.data['q'] = res[:, 1]
-        self.data['r'] = res[:, 2]
-
-        if res.shape[1] > 3 and not ((res[:, 3] == 0).all()):
-            self.data['membership'] = res[:, 3]
+        if False:
+            # self.column_exists('membership'):
+            columns ='pos, altCount, totCount, membership'
             self.membership_set = True
+        else:
+            columns ='pos, altCount, totCount'
+
+        self.data = []
+        self.data = pd.read_sql_query( 'SELECT %s ' % columns + \
+            self.parent().db_table._from_where_(self.chromosome_name, condition_),  \
+            self.parent().db_table.connection )
+
+        self.data.rename(columns={'pos': 'x', 'totCount': 'r', 'altCount': 'q'}, inplace=True)
+#        res = self.parent().db_table.selectPositionArray(self.chromosome_name, \
+#            pos='*', columns = columns,
+#            condition_=condition_)
+        self.data['Mb'] = self.data['x'] * 1e-6
+
+        print('shape: ', self.data.shape)
+        print('data table columns: ', list(self.data))
+#        self.data = np.empty(res.shape[0],
+#                             dtype=[('x', 'i4'), ('q', 'i4'), ('r', 'i4'), ('dx', 'i4'), ('membership', 'f4')])
+#        self.data['x'] = res[:, 0]
+#        self.data['q'] = res[:, 1]
+#        self.data['r'] = res[:, 2]
+
+#        if res.shape[1] > 3 and not ((res[:, 3] == 0).all()):
+#            self.data['membership'] = res[:, 3]
+#            self.membership_set = True
+
         assert (np.diff(self.data['x']) > 0).all()
 
     def get_columns(self):
@@ -169,88 +120,117 @@ class SnpReadsDbChr():
         res = self.parent().db_table.run_query(query)
         return res
 
-    def run(self, plot=False):
-        self.p_x_sel = self.HMM._runFB_(prior='Psel')
-        self.p_x_stat = self.HMM._runFB_(prior='Pstat')
+    def run(self, plot=False, linkage_loosening = 1):
+        self.data['p_slct'], _ = self.HMM.get_model_likelihood(prior='Psel', linkage_loosening=linkage_loosening, fresh=True)
+        self.data['p_stat'], _ = self.HMM.get_model_likelihood(prior='Pstat', linkage_loosening=linkage_loosening, fresh=True)
+        self.data['lod'] = self.data['p_slct'] - self.data['p_stat']
+        
         if plot:
             self.plot_both()
-
+    
     def plot_both(self):
         fig = plt.figure()
         ax = fig.add_subplot(111)
         fig.suptitle('probability')
-        ax.plot(self['x'] * 1e-6, self.p_x_sel, 'r*-', label='selection')
-        ax.plot(self['x'] * 1e-6, self.p_x_stat, 'g-', label='no selection')
+        
+        self.data.plot(ax = ax, x = 'Mb', y = ['p_stat', 'p_slct'], 
+                   style = ['g-', 'r.-'] , label= ['no selection','selection' ])
+#        ax.plot(self['Mb'] , self['p_slct'], 'r.-', label='selection')
+#        ax.plot(self['Mb'] , self['p_stat'], 'g-', label='no selection')
+        
+        def peaks(y, tolerance = None):
+            ddy = np.diff(y, 2)
+            signs = np.diff(np.sign(np.diff(y) )) !=0
+            if tolerance is None:
+                tolerance = np.median(np.abs(ddy[signs])) / 8
+            return np.concatenate(([False,], \
+            signs * (ddy < -tolerance), [False,]) )
+        
+        def plot_peaks(x_, y_, xlab_ = None, ax = plt.gca()):
+            if type(xlab_) == type(None):
+                xlab_ = x_
+            "find peaks"
+            ind = peaks(y_)
+            ax.plot(x_[ind] , y_[ind], 'o', markersize = 8, markerfacecolor = 'none',\
+            markeredgecolor = 'r')
+            for n in range(len(ind)):
+                if ind[n]:
+                    print('peak: %u' % n)
+                    x, y, xl = x_[n] , y_[n], xlab_[n] 
+                    ax.text(x, y, "{:,}".format(xl), style='italic')
+            print('number of peaks: %u' % sum(ind))
+            return
+            
+        plot_peaks(self.data['Mb'], self.data['p_slct'], self.data['x'], ax = ax)
         plt.show()
-        return fig
+        return fig, ax
 
     def unmix(self):
         print('unmixing', file=sys.stderr)
         dx_raw = np.diff(self.data['x'])
-        np.concatenate(([np.Inf], dx_raw[:-1]))
         self.data['dx'] = np.min([np.concatenate(([np.Inf], dx_raw)),
                                   np.concatenate((dx_raw, [np.Inf] ))], axis=0)
-        log10_dx = np.log10(self['dx'])
-        self.data['membership'], self.mixt_obj, iTrue, out_mode_number, _ = unmix(log10_dx)
+        self.data['log10_dx'] = np.log10(self['dx'])
+        self.data['membership'], self.mixt_obj, iTrue, out_mode_number, _ = unmix(self.data['log10_dx'])
         self.membership_set = True
 
     def __getitem__(self, name):
         return self.data[name]
 
-    def find_dense_snps_grid(self, scale=1, shift=0):
-        "characteristic length scale of the Poisson distribution"
-        mu = scale * int(self.length / self.data.shape[0])
-        x_grid = np.arange(0 - shift * mu, self.length, mu)
-        snps_on_grid = np.empty(x_grid.shape, dtype=int)
-
-        for ii in range(0, len(x_grid)):
-            snps_on_grid[ii] = sum(abs(self['x'] - x_grid[ii]) < mu)
-
-        return (x_grid, snps_on_grid)
-
-    def find_dense_snps(self, scale=1, shift=0):
-        "characteristic length scale of the Poisson distribution"
-        mu = scale * int(self.length / self.data.shape[0])
-        x_grid = np.copy(self['x'])
-        snps_on_grid = np.empty(x_grid.shape, dtype=int)
-
-        for ii in range(0, len(x_grid)):
-            snps_on_grid[ii] = sum(abs(self['x'] - x_grid[ii]) < mu)
-
-        return (snps_on_grid)
-
-    def threshold_dense_snps(self, scale=1, shift=0, threshold=3, inv_subscale=10, grid=True):
-        x = [None] * inv_subscale;
-        y = [None] * inv_subscale
-        if grid:
-            for nn in range(inv_subscale):
-                x[nn], y[nn] = self.find_dense_snps_grid(scale, nn / inv_subscale)
-            x = np.fliplr(np.array(x).T).ravel()
-            y = np.fliplr(np.array(y).T).ravel()
-        else:
-            y = np.array(self.find_dense_snps(scale, 0))
-            x = np.copy(self['x'])
-            inv_subscale = 1
-
-        self.crowded_region = close(y > threshold * scale, 1 * inv_subscale)
-        return (self.crowded_region, y, x)
-
-    def plot_snp_density(self, scale=1, shift=0, threshold=3, inv_subscale=10, grid=True):
-        self.crowded_region, y, x = self.threshold_dense_snps(scale=1, shift=0, threshold=3, inv_subscale=10, grid=True)
-
-        import matplotlib.pyplot as plt
-
-        y_max = np.percentile(y, 99);
-        fig = plt.figure()
-        fig.suptitle('snp density')
-        plt.plot(x * 1e-6, y, 'r.-', label = 'density')
-        plt.plot([0, self.length * 1e-6], np.array([1, 1]) * threshold * scale, 'g-', label = 'threshold')
-        plt.plot(x * 1e-6, y_max * self.crowded_region, 'b-', label = 'crowded region label')
-        plt.legend()        
-        plt.ylim((0, np.ceil(1.1*y_max))) 
-        plt.show()
-
-        return self.crowded_region, x
+#    def find_dense_snps_grid(self, scale=1, shift=0):
+#        "characteristic length scale of the Poisson distribution"
+#        mu = scale * int(self.length / self.data.shape[0])
+#        x_grid = np.arange(0 - shift * mu, self.length, mu)
+#        snps_on_grid = np.empty(x_grid.shape, dtype=int)
+#
+#        for ii in range(0, len(x_grid)):
+#            snps_on_grid[ii] = sum(abs(self['x'] - x_grid[ii]) < mu)
+#
+#        return (x_grid, snps_on_grid)
+#
+#    def find_dense_snps(self, scale=1, shift=0):
+#        "characteristic length scale of the Poisson distribution"
+#        mu = scale * int(self.length / self.data.shape[0])
+#        x_grid = np.copy(self['x'])
+#        snps_on_grid = np.empty(x_grid.shape, dtype=int)
+#
+#        for ii in range(0, len(x_grid)):
+#            snps_on_grid[ii] = sum(abs(self['x'] - x_grid[ii]) < mu)
+#
+#        return (snps_on_grid)
+#
+#    def threshold_dense_snps(self, scale=1, shift=0, threshold=3, inv_subscale=10, grid=True):
+#        x = [None] * inv_subscale;
+#        y = [None] * inv_subscale
+#        if grid:
+#            for nn in range(inv_subscale):
+#                x[nn], y[nn] = self.find_dense_snps_grid(scale, nn / inv_subscale)
+#            x = np.fliplr(np.array(x).T).ravel()
+#            y = np.fliplr(np.array(y).T).ravel()
+#        else:
+#            y = np.array(self.find_dense_snps(scale, 0))
+#            x = np.copy(self['x'])
+#            inv_subscale = 1
+#
+#        self.crowded_region = close(y > threshold * scale, 1 * inv_subscale)
+#        return (self.crowded_region, y, x)
+#
+#    def plot_snp_density(self, scale=1, shift=0, threshold=3, inv_subscale=10, grid=True):
+#        self.crowded_region, y, x = self.threshold_dense_snps(scale=1, shift=0, threshold=3, inv_subscale=10, grid=True)
+#
+#        import matplotlib.pyplot as plt
+#
+#        y_max = np.percentile(y, 99);
+#        fig = plt.figure()
+#        fig.suptitle('snp density')
+#        plt.plot(x * 1e-6, y, 'r.-', label = 'density')
+#        plt.plot([0, self.length * 1e-6], np.array([1, 1]) * threshold * scale, 'g-', label = 'threshold')
+#        plt.plot(x * 1e-6, y_max * self.crowded_region, 'b-', label = 'crowded region label')
+#        plt.legend()        
+#        plt.ylim((0, np.ceil(1.1*y_max))) 
+#        plt.show()
+#
+#        return self.crowded_region, x
 
 
 ###############################################################################
@@ -259,6 +239,7 @@ class SnpReadsData():
                  lengths_path='reference/TAIR10-chr-counts.dat'):
         self.pop = population(pop_size);
         self.db_table = GenomeVariantDbReader(file_path, experiment_name, subtable='mtCounts')
+        self.db_table.countRows()
         self.snp_reads_on_chrs = {}
         self.gen_map = GeneticMap()
         self._set_chromosome_lengths_(lengths_path)
@@ -269,9 +250,9 @@ class SnpReadsData():
         else:
             self.chromosome_lengths = ChromosomeLength(path)
 
-    def read_chromosome(self, chromosome_name, \
+    def read_chromosome(self, chromosome_n, \
                         condition_='(totCount >=10) AND (altCount >= 7) AND (CAST(altCount AS FLOAT) / CAST(totCount AS FLOAT) < 0.8)'):
-
+        chromosome_name = self._get_name_from_name_or_numb_(chromosome_n)
         self.snp_reads_on_chrs[chromosome_name] = SnpReadsDbChr(self, chromosome_name, condition_)
         self[chromosome_name].prepare()
 
@@ -282,12 +263,22 @@ class SnpReadsData():
         # def run(self):
 
     #        for self[]
-
-    def __getitem__(self, chromosome_name):
+    def _get_name_from_name_or_numb_(self, chromosome_n):
+        if type(chromosome_n) is int:
+            chromosome_name = self.db_table.contigs[chromosome_n+1]
+        elif chromosome_n in self.db_table.contigs:
+            chromosome_name = chromosome_n
+        else:
+            chromosome_name = None
+            raise KeyError('chromosome %s is not found in the data.' % chromosome_n)
+        return chromosome_name
+        
+    def __getitem__(self, chromosome_n):
         """
         call `s = SnpReadsData(...); s[chromosome_name]`
         to access child `SnpReadsDbChr` objects containing data for `chromosome_name`
         """
+        chromosome_name = self._get_name_from_name_or_numb_(chromosome_n)
         if chromosome_name in self.snp_reads_on_chrs:
             return self.snp_reads_on_chrs[chromosome_name]
         else:
@@ -297,3 +288,6 @@ class SnpReadsData():
             except:
                 chromosome_name = chromosome_name if isinstance(chromosome_name, str) else '%u' % chromosome_name
                 raise KeyError('chromosome %s is not found in the data.' % chromosome_name)
+
+    def run(self):
+        run(self, plot=False, linkage_loosening = 1)

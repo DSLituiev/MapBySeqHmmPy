@@ -22,6 +22,10 @@ def unmix(log_x, max_mode_number=3):
     a wrapper for a Gaussian mixture model;
     returns BIC optimal number of mixtures
     """
+    if len(log_x.shape) < 1:
+        return 1, None, 0, 1, (lambda x: 1)
+    if log_x.shape[0] < 2*max_mode_number:
+        return np.ones(log_x.shape, dtype = float), None, 0, 1, (lambda x: 1)
     mixtBICs = np.zeros(max_mode_number)
     mixt = [None] * max_mode_number
 
