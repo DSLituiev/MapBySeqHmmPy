@@ -30,5 +30,11 @@ class ChromosomeLength:
         for nn, cc in enumerate(self.chromosome_order):
             st += '  \t'. join(['%u' % (nn + 1), '%s' % cc, '%u' % self.dict[cc] ]) + '\n'
         return st
+        
+    def __len__(self):
+        return len(self.chromosome_order)
+    
+    def __floatlist__(self):
+        return [float(self.dict[ss]) for ss in self.chromosome_order]
 
     __str__ = __repr__

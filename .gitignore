@@ -1,4 +1,6 @@
 MO
+output/
+output/**
 reference/**/*
 **/*.csv
 **/*.tmp
